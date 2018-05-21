@@ -189,13 +189,17 @@ int swapInterval = 1;
 // a vector representing origin
 cVector3d original (0,0,0);
 
-// global coordinate arrays used in trajectory writing
-std::vector<double> x_vec = {0};
-std::vector<double> y_vec = {0};
-std::vector<double> z_vec = {0};
+// global coordinate arrays used in trajectory reading and writing
+std::vector<double> ave_x = {0};
+std::vector<double> ave_y = {0};
+std::vector<double> ave_z = {0};
+std::vector<double> stddev_x = {0};
+std::vector<double> stddev_y = {0};
+std::vector<double> stddev_z = {0};
+//std::vector<double> stddev_vec = {0};
 
 // variable for trajectory input file name
-std::string inputfileName;
+std::vector<string> inputFileName;
 
 // variable for trajectory output file name
 std::string outputFileName;
@@ -206,7 +210,10 @@ double Kp;
 // variable for how many points taken from trajectory file
 int length;
 int lines;
-int counter;
+
+// variable for number of trajectories loaded
+int numTrajectories;
+
 
 // save_log variable
 std::vector<cVector3d> positions_unique;
@@ -216,7 +223,7 @@ cVector3d a_position;
 double maxLinearVelocity = 1;
 
 // parameter for where haptic feedback kicks in
-double distanceTolerance = 0.01;
+double distanceTolerance = 0.005;
 
 // global position vectors of the tip of arm and it's join
 cVector3d position, position_2, position_3, position_4;
@@ -287,15 +294,23 @@ int main(int argc, char* argv[])
     cout << "[q] - Exit application" << endl;
     cout << endl << endl;
 
-    //std::cout << " " << std::to_string(length) << endl;
-    // // query user for input inputfileName
-	// cout << "Enter the name of the file to read trajectory from (without extensions): ";
-	// cin >> inputfileName;
+    cout << "Enter number of trajectories to be loaded: ";
+    cin >> numTrajectories;
+
+    if (numTrajectories != 0){
+        for (int i = 0; i < numTrajectories; i++) {
+        // // query user for input inputFileName
+        cout << "Enter the name of the file to read trajectory from (without extensions): ";
+        string space;
+        std::cin >> space;
+        inputFileName.push_back(space);
+        }
+    }
 
     // query user for output fileName
-	 //cout << "Enter the name of the file to record trajectory to (without extensions): ";
-	 //cin >> outputFileName;
-    outputFileName = "please";
+	 cout << "Enter the name of the file to record trajectory to (without extensions)" << endl;
+	 cin >> outputFileName;
+    //outputFileName = "please";
 
     // // query user for proportional feedback constant
     // cout << "Enter proportional force constant (from 0 to 50) ";
@@ -407,6 +422,11 @@ int main(int argc, char* argv[])
                  cVector3d (0.5, 0.0, 0.375),    // look at position (target)
                  cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
+                 // position and orient the camera side view
+    camera->set( cVector3d (0.2, -0.8, 0.375),    // camera position (eye)
+                 cVector3d (0.5, 0.0, 0.375),    // look at position (target)
+                 cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
+
     // set the near and far clipping planes of the camera
     camera->setClippingPlanes(0.01, 10.0);
 
@@ -433,13 +453,14 @@ int main(int argc, char* argv[])
     light->setDir(-1.0, 0.0, 0.0);
 
     // create a sphere (cursor) to represent the haptic device
-    cursor_1 = new cShapeSphere(0.015);
-    cursor_2 = new cShapeSphere(0.012);
-    cursor_3 = new cShapeSphere(0.012);
-    cursor_4 = new cShapeSphere(0.02);
+    double cursorScaler = 1.5;
+    cursor_1 = new cShapeSphere(0.015 * cursorScaler);
+    cursor_2 = new cShapeSphere(0.012 * cursorScaler);
+    cursor_3 = new cShapeSphere(0.012 * cursorScaler);
+    cursor_4 = new cShapeSphere(0.02 * cursorScaler);
 
     // create a sphere to represent the start point
-    startPoint = new cShapeSphere(0.02);
+    startPoint = new cShapeSphere(0.02 * cursorScaler);
 
     // insert cursor inside world
     world->addChild(cursor_1);
@@ -598,29 +619,30 @@ int main(int argc, char* argv[])
     windowSizeCallback(window, width, height);
 
     // reads trajectory data
-    if (useTrajectory){
+    if (useTrajectory && (numTrajectories != 0)){
         trajectoryRead();
-    }
+        // create start point cSphere
+        startPoint->setLocalPos(ave_x[0], ave_y[0], ave_z[0]);
+        // Create guidePath line segment object
+        double index0;
+        double index1;
+        for (int i=0;i<(lines-2);i++){
+            // create vertex 0
+                index0 = guidePath->newVertex(ave_x[i], ave_y[i], ave_z[i]);
+                
+                // create vertex 1
+                index1 = guidePath->newVertex(ave_x[i+1], ave_y[i+1], ave_z[i+1]);
 
-    // create start point cSphere
-    startPoint->setLocalPos(x_vec[0], y_vec[0], z_vec[0]);
-    // Create guidePath line segment object
-    double index0;
-    double index1;
-    for (int i=0;i<(counter-2);i++){
-        // create vertex 0
-            index0 = guidePath->newVertex(x_vec[i], y_vec[i], z_vec[i]);
-            
-            // create vertex 1
-            index1 = guidePath->newVertex(x_vec[i+1], y_vec[i+1], z_vec[i+1]);
-
-            // create segment by connecting both vertices together
-            guidePath->newSegment(index0, index1);
+                // create segment by connecting both vertices together
+                guidePath->newSegment(index0, index1);
      } 
+    
      // sets guidePath object line color to green
     cColorf color;
     color.setYellowGold();
     guidePath->setLineColor(color);
+    }
+
     // main graphic loop
     while (!glfwWindowShouldClose(window))
     {
@@ -647,7 +669,9 @@ int main(int argc, char* argv[])
     glfwTerminate();
 
     // save log
+    if (outputFileName != " "){
     trajectoryWrite();
+    }
 
     // exit
     return 0;
@@ -664,56 +688,170 @@ void trajectoryRead(void)
         homedir = getpwuid(getuid())->pw_dir;
 
     }
+
+    // This is the global position vector which holds all x, y, and z positions 
+    // of each trajectory like:
+    // x1 y1 z1 x2 y2 z2 ... xn yn zn
+    // .  .  .  .  .  .  ... .  .  .
+    // .  .  .  .  .  .  ... .  .  .
+    // .  .  .  .  .  .  ... .  .  .
+    std::vector<vector<double>> pos_matrix(1000, vector<double>(numTrajectories*3));
     
-    std::string inputfileName = "logRead";
-    ifstream trajectoryFile;
-    trajectoryFile.open(string(homedir) + "/chai3d/" + inputfileName + ".m");
-    if (trajectoryFile.fail()) {
-        cerr << "Error Opening Trajectory File, Check File Name" <<endl;
-        exit(1);
-    }
-    double xPoint;
-    double yPoint;
-    double zPoint;
-    counter = 0;    
-    lines = 1500;
-    string line;
 
-    for(int c=4;c<7;++c){
-        for(int i=0;i<lines;i++){   
-            if (c==4 && i==0) {
-                trajectoryFile >> xPoint;
-                x_vec[0] = xPoint;
-            }
-            if (c==4 && i!=0) {
-                trajectoryFile >> xPoint;
-                x_vec.push_back(xPoint);
-            }
-            if (c==5 && i==0) {
-                trajectoryFile >> yPoint;
-                y_vec[0] = yPoint;
-            }
-            if (c==5 && i!=0) {
-                trajectoryFile >> yPoint;
-                y_vec.push_back(yPoint);
-            }
-            if (c==6 && i==0) {
-                trajectoryFile >> zPoint;
-                z_vec[0] = zPoint;
-            }
-            if (c==6 && i!=0) {
-                trajectoryFile >> zPoint;
-                z_vec.push_back(zPoint);
-            }
-            counter = counter + 1;
+    for (int i = 0; i < numTrajectories; i++) {
 
-            //i = i + 1;
+        //std::string inputFileName = "logRead";
+
+        
+
+        ifstream trajectoryFile;
+        trajectoryFile.open(string(homedir) + "/chai3d/" + inputFileName[i] + ".m", ios::in);
+        if (trajectoryFile.fail()) {
+            cerr << "Error Opening Trajectory File, Check File Name" <<endl;
+            exit(1);
         }
-    }
-    counter = counter / 3;
-    trajectoryFile.close();
-    std::cout << "Number of points in trajectory input file " << counter << std::endl;
+        
+        // This variable now indicates the final size of all vectors after resizing
+        lines = 1000; 
+        //string line;
+        double point;
 
+        std::vector<double> all_points = {0};
+
+        while (trajectoryFile.peek()!=EOF) {
+            trajectoryFile >> point;
+            //cout << point;
+            all_points.push_back(point);
+        }
+
+        // removes last point
+        all_points.erase(all_points.begin()+all_points.size()-1);
+
+        // removes first point
+        all_points.erase(all_points.begin());
+
+        //for (int i = 0; i < all_points.size(); i++) {
+
+        //    cout << all_points[i];
+
+        //}
+
+
+        int third = all_points.size() / 3;
+
+        std::vector<double> x_vec = {0};
+        std::vector<double> y_vec = {0};
+        std::vector<double> z_vec = {0};
+
+        // Loading values into x_vec
+        for (int i = 0; i < third; i++) {
+            x_vec.push_back(all_points[i]);
+            //cout << x_vec[i];
+        }
+        x_vec.erase(x_vec.begin());
+        // cout << x_vec[x_vec.size()-1];
+        // Loading values into y_vec
+        for (int i = third; i < 2*third; i++) {
+            y_vec.push_back(all_points[i]);
+            //cout << y_vec[i-third];
+        }
+        y_vec.erase(y_vec.begin());
+
+        // Loading values into z_vec
+        for (int i = 2*third; i < 3*third; i++) {
+            z_vec.push_back(all_points[i]);
+            //cout << z_vec[i-2*third];
+        }
+        z_vec.erase(z_vec.begin());
+
+        /**** VECTOR RESIZING ****/
+        std::vector<double> x_temp = {0};
+        std::vector<double> y_temp = {0};
+        std::vector<double> z_temp = {0};
+
+        double division = x_vec.size() / lines;
+        int multiplier = 0;
+
+        for (int i = 0; i < lines; i++) {
+            x_temp.push_back(x_vec[round(multiplier * division)]);
+            y_temp.push_back(y_vec[round(multiplier * division)]);
+            z_temp.push_back(z_vec[round(multiplier * division)]);
+            //cout << x_temp[i];
+            multiplier++;
+        }
+
+        x_temp.erase(x_temp.begin());
+        y_temp.erase(y_temp.begin());
+        z_temp.erase(z_temp.begin());
+
+        // clearing original position vectors and inputting temporary values
+
+        x_vec.clear();
+        y_vec.clear();
+        z_vec.clear();
+
+        for (int i = 0; i < lines; i++) {
+            x_vec.push_back(x_temp[i]);
+            y_vec.push_back(y_temp[i]);
+            z_vec.push_back(z_temp[i]);
+            //cout << x_vec.size();
+        }
+        /**** END OF VECTOR RESIZING ****/
+
+        trajectoryFile.close();
+        std::cout << "Number of points in trajectory input file " << third << std::endl;
+
+    // Creating position matrix
+        for (int j = 0; j < lines; j++) {
+
+            pos_matrix[j][3*i] = x_vec[j];
+            pos_matrix[j][3*i + 1] = y_vec[j];
+            pos_matrix[j][3*i + 2] = z_vec[j];
+
+        }
+
+    }
+    // End of trajectory-adding loop
+
+
+    /***** Creating average and stddev trajectories *****/
+    ave_x.erase(ave_x.begin());
+    ave_y.erase(ave_y.begin());
+    ave_z.erase(ave_z.begin());
+    
+    for (int j = 0; j < lines; j++) {
+        double xsum = 0;
+        double ysum = 0;
+        double zsum = 0;
+        for (int i = 0; i < numTrajectories; i++) {
+            xsum = xsum + pos_matrix[j][3*i];
+            ysum = ysum + pos_matrix[j][3*i + 1];
+            zsum = zsum + pos_matrix[j][3*i + 2];
+        }
+        ave_x.push_back(xsum/numTrajectories);
+        ave_y.push_back(ysum/numTrajectories);
+        ave_z.push_back(zsum/numTrajectories);
+    } 
+
+
+    // Creating stddev vectors
+    stddev_x.erase(stddev_x.begin());
+    stddev_y.erase(stddev_y.begin());
+    stddev_z.erase(stddev_z.begin());
+
+    for (int j = 0; j < lines; j++) {
+        double xsum = 0;
+        double ysum = 0;
+        double zsum = 0;
+        for (int i = 0; i < numTrajectories; i++) {
+            xsum = xsum + pow(pos_matrix[j][3*i] - ave_x[j],2);
+            ysum = ysum + pow(pos_matrix[j][3*i + 1] - ave_y[j],2);
+            zsum = zsum + pow(pos_matrix[j][3*i + 2] - ave_z[j],2);
+        }
+        stddev_x.push_back(sqrt(xsum/numTrajectories));
+        stddev_y.push_back(sqrt(ysum/numTrajectories));
+        stddev_z.push_back(sqrt(zsum/numTrajectories));
+    }
 }
 
 void trajectoryWrite(void)
@@ -1043,20 +1181,21 @@ void updateHaptics(void)
         ////////////////////////////////////////////////////////////////////
 
         // initializing minimum distance from haptic device
-        double min = sqrt(pow(x_vec[0]-position.x(),2) + pow(y_vec[0]-position.y(),2) + pow(z_vec[0]-position.z(),2));
-
+        double min = sqrt(pow(ave_x[0]-position.x(),2) + pow(ave_y[0]-position.y(),2) + pow(ave_z[0]-position.z(),2));
         // index of mininum-distance point
         int minIndex = 0;
 
         // Loop through every point on trajectory and change min and minIndex if a smaller distance is found
         for (int i=1; i<length; i++) {
-                double nextDistance = sqrt(pow(x_vec[i]-position.x(),2) + pow(y_vec[i]-position.y(),2) + pow(z_vec[i]-position.z(),2));
+                double nextDistance = sqrt(pow(ave_x[i]-position.x(),2) + pow(ave_y[i]-position.y(),2) + pow(ave_z[i]-position.z(),2));
                 if (nextDistance < min) {
                     min = nextDistance;
                     minIndex = i;
+                    
                 }
         }
-           
+        double stdDevMag = sqrt(pow(stddev_x[minIndex],2) + pow(stddev_y[minIndex],2) + pow(stddev_z[minIndex],2));
+
             //cVector3d currentPosition (position.x(),position.y(),position.z());
             double x_hold = position.x();
             double y_hold = position.y();
@@ -1075,13 +1214,15 @@ void updateHaptics(void)
 
         // desired position
         cVector3d desiredPosition;
-        if (min > distanceTolerance){
-            desiredPosition.set(x_vec[minIndex], y_vec[minIndex], z_vec[minIndex]);
-        }
-        else {
+        double kpScaler = 1;
+        if (min < distanceTolerance || min < stdDevMag){
             desiredPosition.set(position.x(),position.y(),position.z());
         }
-
+        else {
+            
+            desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
+        }
+    
         // desired orientation
         //cMatrix3d desiredRotation;
         //desiredRotation.identity();
@@ -1091,11 +1232,20 @@ void updateHaptics(void)
         cVector3d torque (0,0,0);
 
         // apply force field
-        if (useForceField)
+        if (useForceField && numTrajectories !=0)
         {
+            if (stdDevMag > (min)){
+                kpScaler = 1;
+            }
+            if ( stdDevMag > (2 * (min))){
+                kpScaler = 0.5;
+            }
+            if ( stdDevMag > (2.5 * (min))){
+                kpScaler = 0.25;
+            }
             // compute linear force
-            Kp = 25; // [N/m]
-            cVector3d forceField = Kp * (desiredPosition - position);
+            Kp = 25 * kpScaler; // [N/m]
+            cVector3d forceField; 
             force.add(forceField);
 
             // compute angular torque
