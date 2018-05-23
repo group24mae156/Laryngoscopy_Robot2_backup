@@ -53,6 +53,10 @@ using namespace std;
 #include <pwd.h>
 #include <string>
 #include <vector>
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <dirent.h>
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -105,10 +109,10 @@ cShapeSphere* startPoint;
 // a haptic device handler
 cHapticDeviceHandler* handler;
 
-// create a line segment object to represent target trajectory
+// a line segment object to represent target trajectory
 cMultiSegment* guidePath = new cMultiSegment();
 
-// create a line sgement object to connect joints of arms
+// a line sgement object to connect joints of arms
 cMultiSegment* jointRelations = new cMultiSegment();
 
 // a pointer to the current haptic device
@@ -186,17 +190,13 @@ int height = 0;
 // swap interval for the display context (vertical synchronization)
 int swapInterval = 1;
 
-// a vector representing origin
-cVector3d original (0,0,0);
-
-// global coordinate arrays used in trajectory reading and writing
+// global coordinate vectors used in trajectory reading and writing
 std::vector<double> ave_x = {0};
 std::vector<double> ave_y = {0};
 std::vector<double> ave_z = {0};
 std::vector<double> stddev_x = {0};
 std::vector<double> stddev_y = {0};
 std::vector<double> stddev_z = {0};
-//std::vector<double> stddev_vec = {0};
 
 // variable for trajectory input file name
 std::vector<string> inputFileName;
@@ -214,8 +214,7 @@ int lines;
 // variable for number of trajectories loaded
 int numTrajectories;
 
-
-// save_log variable
+// save_log variables
 std::vector<cVector3d> positions_unique;
 cVector3d a_position;
 
@@ -228,8 +227,8 @@ double distanceTolerance = 0.01;
 // global position vectors of the tip of arm and it's join
 cVector3d position, position_2, position_3, position_4;
 
-// global vectors used to erase joint connection segments upon update
-cVector3d vertex1, vertex2, vertex3, vertex4;
+// variable to store location of home directory
+const char *homedir;
 //------------------------------------------------------------------------------
 // DECLARED FUNCTIONS
 //------------------------------------------------------------------------------
@@ -293,19 +292,68 @@ int main(int argc, char* argv[])
     cout << "[m] - Enable/Disable vertical mirroring" << endl;
     cout << "[q] - Exit application" << endl;
     cout << endl << endl;
+    
+    // finds home directory location
+    if ((homedir = getenv("HOME")) == NULL) {
 
-    string quickCompile;
+        homedir = getpwuid(getuid())->pw_dir;
+
+    }
+    // inputs user mode
+    string userMode;
     string space;
     cout << "Enter project mode: ";
-    cin >> quickCompile;
-    if (quickCompile == "test"){
+    cin >> userMode;
+
+    // for easy compiling and testing
+    if (userMode == "test"){
         numTrajectories = 1;
         inputFileName.push_back("trajectory1");
         outputFileName = "please";
         proportionalInput = 25;
     }
     
-    if (quickCompile != "test"){
+    // for loading multiple trajectories with integer name differencce in same folder
+    else if (userMode == "multi"){
+        // finds number of files in trajectory folder to be loaded
+        DIR *dp;
+        int fileCount;
+        struct dirent *ep;
+        string directoryName;
+        cout << "Enter trajectory folder: ";
+        cin >> directoryName;
+        string directoryPath = string(homedir) + "/chai3d/trajectory files/" + directoryName;
+        dp = opendir (directoryPath.c_str());
+
+        if (dp != NULL)
+        {
+            while (ep = readdir(dp))
+            fileCount++;
+            closedir(dp);
+        }
+        else{
+            perror ("Couldn't open the directory");
+            exit(1);
+        }
+        //printf("There's %d files in the current directory.\n", fileCount);
+
+        // shifted to account for hidden "." and ".." file  in directory
+        for (int i=1; i<(fileCount-1); i++){
+            inputFileName.push_back(directoryName + "/" + directoryName + std::to_string(i));
+            //cout << inputFileName[i-1] +"\n";
+            numTrajectories = i;
+        }
+        // query user for output fileName
+        cout << "Enter the name of the file to record trajectory to (without extensions)" << endl;
+        cin >> outputFileName;
+
+        // // query user for proportional feedback constant
+        cout << "Enter proportional force constant (from 0 to 50) ";
+        cin >> proportionalInput;
+    }
+
+    // for loading any number of trajectories from generic trajectory folder
+    else{
         cout << "Enter number of trajectories to be loaded: ";
         cin >> numTrajectories;
 
@@ -433,7 +481,7 @@ int main(int argc, char* argv[])
     //              cVector3d (0.5, 0.0, 0.375),    // look at position (target)
     //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
-                 // position and orient the camera side view
+    // position and orient the camera side view
     camera->set( cVector3d (0.2, -0.8, 0.375),    // camera position (eye)
                  cVector3d (0.5, 0.0, 0.375),    // look at position (target)
                  cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
@@ -473,13 +521,13 @@ int main(int argc, char* argv[])
     // create a sphere to represent the start point
     startPoint = new cShapeSphere(0.02 * cursorScaler);
 
-    // insert cursor inside world
+    // insert cursor into world
     world->addChild(cursor_1);
     world->addChild(cursor_2);
     world->addChild(cursor_3);
     world->addChild(cursor_4);
 
-    // insert start point to world
+    // insert start point into world
     world->addChild(startPoint);
 
     // add guide path trajectory into world
@@ -488,7 +536,7 @@ int main(int argc, char* argv[])
     // add joint relations object into world
     world->addChild(jointRelations);
 
-    // assign line width
+    // assign line width of multiSegment objects
     guidePath->setLineWidth(3.0);
     jointRelations->setLineWidth(3.0);
 
@@ -590,7 +638,7 @@ int main(int argc, char* argv[])
     labelForcesAxes->setText("X Force Y Force Z Force");
     camera->m_frontLayer->addChild(labelForcesAxes);
 
-    // create a label to display the forces on haptic device
+    // create a label to display the forces on tip of haptic device
     labelForces = new cLabel(font);
     labelForces->m_fontColor.setBlack();
     camera->m_frontLayer->addChild(labelForces);
@@ -632,23 +680,24 @@ int main(int argc, char* argv[])
     // reads trajectory data
     if (useTrajectory && (numTrajectories != 0)){
         trajectoryRead();
-        // create start point cSphere
+        // set start point position
         startPoint->setLocalPos(ave_x[0], ave_y[0], ave_z[0]);
+
         // Create guidePath line segment object
         double index0;
         double index1;
         for (int i=0;i<(lines-2);i++){
             // create vertex 0
-                index0 = guidePath->newVertex(ave_x[i], ave_y[i], ave_z[i]);
+            index0 = guidePath->newVertex(ave_x[i], ave_y[i], ave_z[i]);
                 
-                // create vertex 1
-                index1 = guidePath->newVertex(ave_x[i+1], ave_y[i+1], ave_z[i+1]);
+            // create vertex 1
+            index1 = guidePath->newVertex(ave_x[i+1], ave_y[i+1], ave_z[i+1]);
 
-                // create segment by connecting both vertices together
-                guidePath->newSegment(index0, index1);
+            // create segment by connecting both vertices together
+            guidePath->newSegment(index0, index1);
      } 
     
-     // sets guidePath object line color to green
+    // sets guidePath object line color to green
     cColorf color;
     color.setYellowGold();
     guidePath->setLineColor(color);
@@ -691,44 +740,30 @@ int main(int argc, char* argv[])
 //------------------------------------------------------------------------------
 void trajectoryRead(void)
 {
- // open and load trajectory file
-    const char *homedir;
-
-    if ((homedir = getenv("HOME")) == NULL) {
-
-        homedir = getpwuid(getuid())->pw_dir;
-
-    }
+     // open and load trajectory file
 
     // This is the global position vector which holds all x, y, and z positions 
     // of each trajectory like:
     // x1 y1 z1 x2 y2 z2 ... xn yn zn
     // .  .  .  .  .  .  ... .  .  .
     // .  .  .  .  .  .  ... .  .  .
-    // .  .  .  .  .  .  ... .  .  .
     std::vector<vector<double>> pos_matrix(1000, vector<double>(numTrajectories*3));
     
-
+    // opens trajectory file
     for (int i = 0; i < numTrajectories; i++) {
-
-        //std::string inputFileName = "logRead";
-
-        
-
         ifstream trajectoryFile;
-        trajectoryFile.open(string(homedir) + "/chai3d/" + inputFileName[i] + ".m", ios::in);
+        trajectoryFile.open(string(homedir) + "/chai3d/trajectory files/" + inputFileName[i] + ".m", ios::in);
         if (trajectoryFile.fail()) {
             cerr << "Error Opening Trajectory File, Check File Name" <<endl;
             exit(1);
         }
         
-        // This variable now indicates the final size of all vectors after resizing
+        // this variable indicates the final size of all vectors after resizing
         lines = 1000; 
-        //string line;
         double point;
-
         std::vector<double> all_points = {0};
 
+        // reads data in until end of file
         while (trajectoryFile.peek()!=EOF) {
             trajectoryFile >> point;
             //cout << point;
@@ -868,14 +903,9 @@ void trajectoryRead(void)
 void trajectoryWrite(void)
 {
     using namespace std;
-    const char *homedir;
-    if ((homedir = getenv("HOME")) == NULL) {
-        homedir = getpwuid(getuid())->pw_dir;
-    }
     std::ofstream myfile;
-    myfile.open (std::string(homedir) + "/chai3d/" + outputFileName + ".m");
+    myfile.open (std::string(homedir) + "/chai3d/trajectory files/" + outputFileName + ".m");
     length = positions_unique.size(); 
-    // defining variable for trajectory use
     std::cout << "Number of points in trajectory output file " << length << std::endl;
     string channel[3] = {"Test1","Test2","Test3"}; 
     for(int c=4;c<7;++c){
