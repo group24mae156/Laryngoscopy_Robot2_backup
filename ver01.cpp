@@ -205,7 +205,7 @@ std::vector<string> inputFileName;
 std::string outputFileName;
 
 // variable for proportional force feedback
-double Kp;
+double proportionalInput;
 
 // variable for how many points taken from trajectory file
 int length;
@@ -223,7 +223,7 @@ cVector3d a_position;
 double maxLinearVelocity = 1;
 
 // parameter for where haptic feedback kicks in
-double distanceTolerance = 0.005;
+double distanceTolerance = 0.01;
 
 // global position vectors of the tip of arm and it's join
 cVector3d position, position_2, position_3, position_4;
@@ -294,28 +294,39 @@ int main(int argc, char* argv[])
     cout << "[q] - Exit application" << endl;
     cout << endl << endl;
 
-    cout << "Enter number of trajectories to be loaded: ";
-    cin >> numTrajectories;
-
-    if (numTrajectories != 0){
-        for (int i = 0; i < numTrajectories; i++) {
-        // // query user for input inputFileName
-        cout << "Enter the name of the file to read trajectory from (without extensions): ";
-        string space;
-        std::cin >> space;
-        inputFileName.push_back(space);
-        }
+    string quickCompile;
+    string space;
+    cout << "Enter project mode: ";
+    cin >> quickCompile;
+    if (quickCompile == "test"){
+        numTrajectories = 1;
+        inputFileName.push_back("trajectory1");
+        outputFileName = "please";
+        proportionalInput = 25;
     }
+    
+    if (quickCompile != "test"){
+        cout << "Enter number of trajectories to be loaded: ";
+        cin >> numTrajectories;
 
-    // query user for output fileName
-	 cout << "Enter the name of the file to record trajectory to (without extensions)" << endl;
-	 cin >> outputFileName;
-    //outputFileName = "please";
+        if (numTrajectories != 0){
+            for (int i = 0; i < numTrajectories; i++) {
+            // // query user for input inputFileName
+            cout << "Enter the name of the file to read trajectory from (without extensions): ";
+            string space;
+            std::cin >> space;
+            inputFileName.push_back(space);
+            }
+        }
 
-    // // query user for proportional feedback constant
-    // cout << "Enter proportional force constant (from 0 to 50) ";
-	// cin >> Kp;
+        // query user for output fileName
+        cout << "Enter the name of the file to record trajectory to (without extensions)" << endl;
+        cin >> outputFileName;
 
+        // // query user for proportional feedback constant
+        cout << "Enter proportional force constant (from 0 to 50) ";
+        cin >> proportionalInput;
+    }
 
 
     //--------------------------------------------------------------------------
@@ -412,15 +423,15 @@ int main(int argc, char* argv[])
     //              cVector3d (1.0, 0.0, 0.375),    // look at position (target)
     //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
-    // position and orient the camera side view
-    camera->set( cVector3d (0.5, -0.3, 0.25),    // camera position (eye)
-                 cVector3d (0.5, 0.0, 0.375),    // look at position (target)
-                 cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
+    // // position and orient the camera side view
+    // camera->set( cVector3d (0.5, -0.3, 0.25),    // camera position (eye)
+    //              cVector3d (0.5, 0.0, 0.375),    // look at position (target)
+    //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
-    // position and orient the camera side view
-    camera->set( cVector3d (1, -0.5, 0.375),    // camera position (eye)
-                 cVector3d (0.5, 0.0, 0.375),    // look at position (target)
-                 cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
+    // // position and orient the camera side view
+    // camera->set( cVector3d (1, -0.5, 0.375),    // camera position (eye)
+    //              cVector3d (0.5, 0.0, 0.375),    // look at position (target)
+    //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
                  // position and orient the camera side view
     camera->set( cVector3d (0.2, -0.8, 0.375),    // camera position (eye)
@@ -1215,12 +1226,20 @@ void updateHaptics(void)
         // desired position
         cVector3d desiredPosition;
         double kpScaler = 1;
-        if (min < distanceTolerance || min < stdDevMag){
-            desiredPosition.set(position.x(),position.y(),position.z());
+        // if (min < distanceTolerance || min < stdDevMag){
+        //     desiredPosition.set(position.x(),position.y(),position.z());
+        // }
+        // else {
+            
+        //     desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
+        // }
+
+        if (min > distanceTolerance ){
+            desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
         }
         else {
+            desiredPosition.set(position.x(),position.y(),position.z());
             
-            desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
         }
     
         // desired orientation
@@ -1231,11 +1250,11 @@ void updateHaptics(void)
         cVector3d force (0,0,0);
         cVector3d torque (0,0,0);
 
-        // apply force field
+        //apply force field
         if (useForceField && numTrajectories !=0)
         {
             if (stdDevMag > (min)){
-                kpScaler = 1;
+                kpScaler = 0.75;
             }
             if ( stdDevMag > (2 * (min))){
                 kpScaler = 0.5;
@@ -1244,8 +1263,8 @@ void updateHaptics(void)
                 kpScaler = 0.25;
             }
             // compute linear force
-            Kp = 25 * kpScaler; // [N/m]
-            cVector3d forceField; 
+            double Kp = proportionalInput * kpScaler; // [N/m]
+            cVector3d forceField = Kp * (desiredPosition - position);
             force.add(forceField);
 
             // compute angular torque
