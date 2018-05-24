@@ -30,7 +30,7 @@
     POSSIBILITY OF SUCH DAMAGE. 
     \author   <http://www.chai3d.org>
     \author   Francois Conti
-    \autor    Michael Berger
+    \author    Michael Berger
 */
 //==============================================================================
 
@@ -302,7 +302,7 @@ int main(int argc, char* argv[])
     // inputs user mode
     string userMode;
     string space;
-    cout << "Enter project mode: ";
+    cout << "Enter project mode {Options: test, multi, else}: ";
     cin >> userMode;
 
     // for easy compiling and testing
@@ -344,7 +344,7 @@ int main(int argc, char* argv[])
             numTrajectories = i;
         }
         // query user for output fileName
-        cout << "Enter the name of the file to record trajectory to (without extensions)" << endl;
+        cout << "Enter the name of the file to record trajectory to (without extensions): ";
         cin >> outputFileName;
 
         // // query user for proportional feedback constant
@@ -680,6 +680,7 @@ int main(int argc, char* argv[])
     // reads trajectory data
     if (useTrajectory && (numTrajectories != 0)){
         trajectoryRead();
+
         // set start point position
         startPoint->setLocalPos(ave_x[0], ave_y[0], ave_z[0]);
 
@@ -695,12 +696,13 @@ int main(int argc, char* argv[])
 
             // create segment by connecting both vertices together
             guidePath->newSegment(index0, index1);
-     } 
+        } 
     
     // sets guidePath object line color to green
     cColorf color;
     color.setYellowGold();
     guidePath->setLineColor(color);
+
     }
 
     // main graphic loop
@@ -740,8 +742,6 @@ int main(int argc, char* argv[])
 //------------------------------------------------------------------------------
 void trajectoryRead(void)
 {
-     // open and load trajectory file
-
     // This is the global position vector which holds all x, y, and z positions 
     // of each trajectory like:
     // x1 y1 z1 x2 y2 z2 ... xn yn zn
@@ -781,7 +781,6 @@ void trajectoryRead(void)
         //    cout << all_points[i];
 
         //}
-
 
         int third = all_points.size() / 3;
 
@@ -831,7 +830,6 @@ void trajectoryRead(void)
         z_temp.erase(z_temp.begin());
 
         // clearing original position vectors and inputting temporary values
-
         x_vec.clear();
         y_vec.clear();
         z_vec.clear();
@@ -845,20 +843,16 @@ void trajectoryRead(void)
         /**** END OF VECTOR RESIZING ****/
 
         trajectoryFile.close();
-        std::cout << "Number of points in trajectory input file " << third << std::endl;
+        //std::cout << "Number of points in trajectory input file " << third << std::endl;
 
     // Creating position matrix
         for (int j = 0; j < lines; j++) {
-
             pos_matrix[j][3*i] = x_vec[j];
             pos_matrix[j][3*i + 1] = y_vec[j];
             pos_matrix[j][3*i + 2] = z_vec[j];
-
         }
-
     }
     // End of trajectory-adding loop
-
 
     /***** Creating average and stddev trajectories *****/
     ave_x.erase(ave_x.begin());
@@ -878,7 +872,6 @@ void trajectoryRead(void)
         ave_y.push_back(ysum/numTrajectories);
         ave_z.push_back(zsum/numTrajectories);
     } 
-
 
     // Creating stddev vectors
     stddev_x.erase(stddev_x.begin());
