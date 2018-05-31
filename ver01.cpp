@@ -581,7 +581,7 @@ int main(int argc, char* argv[])
     if (info.m_sensedRotation == true)
     {
         // display reference frame
-        cursor_1->setShowFrame(true);
+        cursor_1->setShowFrame(true,true);
 
         // set the size of the reference frame
         cursor_1->setFrameSize(0.05);
@@ -1328,6 +1328,7 @@ void updateHaptics(void)
 
         // sleep to set update rate at approximately 1000Hz
          usleep(925);
+         //cout << "Work";
     }
     
     // exit haptics thread
