@@ -152,9 +152,9 @@ cAluminumDevice::configuration default_woody(){
     0.0259, //torque_constant_motor_b
     0.0259, //torque_constant_motor_c
     3.0, //current_for_10_v_signal
-    2000, //cpr_encoder_a
-    2000, //cpr_encoder_b
-    2000, //cpr_encoder_c
+    500, //cpr_encoder_a
+    500, //cpr_encoder_b
+    500, //cpr_encoder_c
     20.0, //max_linear_force
     1000.0, //max_linear_stiffness
     8.0, //max_linear_damping

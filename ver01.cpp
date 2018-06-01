@@ -82,7 +82,7 @@ bool mirroredDisplay = false;
 bool showJoints = true;
 
 // have safety shutoff for too high velocity reading
-bool useVelocitySafety = true;
+bool useVelocitySafety = false;
 
 //------------------------------------------------------------------------------
 // DECLARED VARIABLES
