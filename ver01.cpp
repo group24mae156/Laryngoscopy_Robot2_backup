@@ -308,9 +308,9 @@ int main(int argc, char* argv[])
     // for easy compiling and testing
     if (userMode == "test"){
         numTrajectories = 1;
-        inputFileName.push_back("trajectory1");
-        outputFileName = "please";
-        proportionalInput = 25;
+        inputFileName.push_back("please");
+        outputFileName = "trajectory1";
+        proportionalInput = 75;
     }
     
     // for loading multiple trajectories with integer name differencce in same folder
@@ -348,7 +348,7 @@ int main(int argc, char* argv[])
         cin >> outputFileName;
 
         // // query user for proportional feedback constant
-        cout << "Enter proportional force constant (from 0 to 50) ";
+        cout << "Enter proportional force constant (from 0 to 150) ";
         cin >> proportionalInput;
     }
 
@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
     //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
     // position and orient the camera side view
-    camera->set( cVector3d (0.2, -0.8, 0.375),    // camera position (eye)
+    camera->set( cVector3d (0.5, -0.8, 0.375),    // camera position (eye)
                  cVector3d (0.5, 0.0, 0.375),    // look at position (target)
                  cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
 
@@ -1191,7 +1191,7 @@ void updateHaptics(void)
         hapticeDeviceLinearVelocity = std::to_string(currentVelocity);
 
         // safety shutdown
-        if (useVelocitySafety && (loopCount > 100) && (currentVelocity > maxLinearVelocity)) {
+        if (useVelocitySafety && (loopCount > 1000) && (currentVelocity > maxLinearVelocity)) {
         cerr << "Linear Velocity Too High, System Shutdown" <<endl;
         GLFWwindow* a_window;
         glfwSetWindowShouldClose(a_window, GLFW_TRUE);
@@ -1220,7 +1220,7 @@ void updateHaptics(void)
         int minIndex = 0;
 
         // Loop through every point on trajectory and change min and minIndex if a smaller distance is found
-        for (int i=1; i<length; i++) {
+        for (int i=1; i<lines; i++) {
                 double nextDistance = sqrt(pow(ave_x[i]-position.x(),2) + pow(ave_y[i]-position.y(),2) + pow(ave_z[i]-position.z(),2));
                 if (nextDistance < min) {
                     min = nextDistance;
@@ -1272,7 +1272,7 @@ void updateHaptics(void)
         // variables for forces
         cVector3d force (0,0,0);
         cVector3d torque (0,0,0);
-
+        double gripperForce = 0;
         //apply force field
         if (useForceField && numTrajectories !=0)
         {
@@ -1320,14 +1320,14 @@ void updateHaptics(void)
          hapticDeviceForces = force;
 
         // send computed force, torque, and gripper force to haptic device
-        //hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
+        hapticDevice->setForceAndTorqueAndGripperForce(force, torque, gripperForce);
 
         // signal frequency counter
         freqCounterHaptics.signal(1);
         loopCount = loopCount + 1;
 
         // sleep to set update rate at approximately 1000Hz
-         usleep(925);
+         usleep(325);
          //cout << "Work";
     }
     

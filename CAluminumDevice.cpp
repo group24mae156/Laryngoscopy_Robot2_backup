@@ -134,13 +134,39 @@ std::string toJSON(const aluminumhaptics_message& m) {
 //==============================================================================
 
 cAluminumDevice::configuration default_woody(){
-    double data[] = { 0, 0.010, 0.010, 0.010,
-                      0.080, 0.205, 0.245,
-                      0.160, 0.120, 0.120,
-                      0.220, 0.000, 0.080, 0.100, 
-                      0.0259, 0.0259, 0.0259, 3.0, 500, 500, 500,
-                      20.0, 1000.0, 8.0,
-                      0.170, 0.110, 0.051, 0.091, 9.81, 0, 0, 0, 0};
+    double data[] = { 0, //variant
+    0.0099568, //diameter_capstan_a
+    0.0099314, //diameter_capstan_b 
+    0.0099314, //diameter_capstan_c
+    0.088289892, //length_body_a
+    0.205000098, //length_body_b
+    0.14605, //length_body_c (without u joint)
+    0.158999936, //diameter_body_a
+    0.114173, //diameter_body_b
+    0.114173, //diameter_body_c
+    0.220, // workspace_origin_x
+    0.000, // workspace_origin_y
+    0.080, // workspace_origin_z
+    0.100, //workspace_radius
+    0.0259, //torque_constant_motor_a
+    0.0259, //torque_constant_motor_b
+    0.0259, //torque_constant_motor_c
+    3.0, //current_for_10_v_signal
+    500, //cpr_encoder_a
+    500, //cpr_encoder_b
+    500, //cpr_encoder_c
+    20.0, //max_linear_force
+    1000.0, //max_linear_stiffness
+    8.0, //max_linear_damping
+    0.570, //mass_body_b
+    0.138, //mass_body_c
+    0.054864, //length_cm_body_b
+    0.027019758, //length_cm_body_c
+    9.81, //g_constant
+    0, //angle_1
+    0, //angle_2
+    0, //angle_3
+    0}; //offset_angle
     return cAluminumDevice::configuration(data); 
 }
 
@@ -244,7 +270,7 @@ void write_config_file(const cAluminumDevice::configuration& config, unsigned in
     }
 
     std::cout << "Writing configuration to: "<< homedir 
-              << "/chai3d/chai3d/aluminumhapticsArm.json" << std::endl;
+              << "/chai3d/aluminumhapticsArm.json" << std::endl;
     std::ofstream ofile;
     ofile.open(std::string(homedir) + "/chai3d/aluminumhapticsArm.json");
     ofile << toJSON(config);
@@ -1070,6 +1096,10 @@ bool cAluminumDevice::getPosition(cVector3d& a_position, cVector3d& a_position_2
     x_2 = cos(m_config.offset_angle)*(cos(tA)*(Lb*sin(tB)+0*sin(0)) - 0.015384*sin(tA)) - sin(m_config.offset_angle)*(sin(tA)*(Lb*sin(tB)+0*sin(0)) + 0.015384*cos(tA)) + m_config.workspace_origin_x;
     y_2 = sin(m_config.offset_angle)*(cos(tA)*(Lb*sin(tB)+0*sin(0)) - 0.015384*sin(tA)) + cos(m_config.offset_angle)*(sin(tA)*(Lb*sin(tB)+0*sin(0)) + 0.015834*cos(tA)) + m_config.workspace_origin_y;
     z_2 = Ln+Lb*cos(tB)-0*cos(0) + m_config.workspace_origin_z; 
+
+    // x = x_2;
+    // y = y_2;
+    // z = z_2;
 
     x_3 = cos(m_config.offset_angle)*(cos(tA)*(0*sin(0)+0*sin(0)) - 0.015384*sin(tA)) - sin(m_config.offset_angle)*(sin(tA)*(0*sin(0)+0*sin(0)) + 0.015384*cos(tA)) + m_config.workspace_origin_x;
     y_3 = sin(m_config.offset_angle)*(cos(tA)*(0*sin(0)+0*sin(0)) - 0.015384*sin(tA)) + cos(m_config.offset_angle)*(sin(tA)*(0*sin(0)+0*sin(0)) + 0.015834*cos(tA)) + m_config.workspace_origin_y;
