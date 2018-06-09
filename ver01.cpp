@@ -155,7 +155,7 @@ cLabel* labelForcesAxes;
 bool useDamping = false;
 
 // a flag for using force field (ON/OFF)
-bool useForceField = true;
+bool useForceField = false;
 
 // a flag to indicate if the haptic simulation currently running
 bool simulationRunning = false;
@@ -302,6 +302,7 @@ int main(int argc, char* argv[])
     // inputs user mode
     string userMode;
     string space;
+    cout << "See mode instructions in chai3d/trajectory files/README.txt" << endl;
     cout << "Enter project mode {Options: test, multi, else}: ";
     cin >> userMode;
 
@@ -348,7 +349,7 @@ int main(int argc, char* argv[])
         cin >> outputFileName;
 
         // // query user for proportional feedback constant
-        cout << "Enter proportional force constant (from 0 to 150) ";
+        cout << "Enter proportional force constant (from 0 to 100) ";
         cin >> proportionalInput;
     }
 
@@ -372,7 +373,7 @@ int main(int argc, char* argv[])
         cin >> outputFileName;
 
         // // query user for proportional feedback constant
-        cout << "Enter proportional force constant (from 0 to 50) ";
+        cout << "Enter proportional force constant (from 0 to 150) ";
         cin >> proportionalInput;
     }
 
@@ -466,21 +467,6 @@ int main(int argc, char* argv[])
     camera = new cCamera(world);
     world->addChild(camera);
 
-    // // position and orient the camera front view
-    // camera->set( cVector3d (0.0, 0.0, 0.375),    // camera position (eye)
-    //              cVector3d (1.0, 0.0, 0.375),    // look at position (target)
-    //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
-
-    // // position and orient the camera side view
-    // camera->set( cVector3d (0.5, -0.3, 0.25),    // camera position (eye)
-    //              cVector3d (0.5, 0.0, 0.375),    // look at position (target)
-    //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
-
-    // // position and orient the camera side view
-    // camera->set( cVector3d (1, -0.5, 0.375),    // camera position (eye)
-    //              cVector3d (0.5, 0.0, 0.375),    // look at position (target)
-    //              cVector3d (0.0, 0.0, 1.0));   // direction of the (up) vector
-
     // position and orient the camera side view
     camera->set( cVector3d (0.5, -0.8, 0.375),    // camera position (eye)
                  cVector3d (0.5, 0.0, 0.375),    // look at position (target)
@@ -563,7 +549,6 @@ int main(int argc, char* argv[])
     handler = new cHapticDeviceHandler();
 
     // get a handle to the first haptic device
-    //handler->getDevice(hapticDevice, 0);
     cGenericHapticDevicePtr ptrRetrieval;
 	handler->getDevice(ptrRetrieval, 0);
     hapticDevice = dynamic_pointer_cast<cAluminumDevice>(ptrRetrieval);
@@ -775,7 +760,8 @@ void trajectoryRead(void)
 
         // removes first point
         all_points.erase(all_points.begin());
-
+        
+        //debugging
         //for (int i = 0; i < all_points.size(); i++) {
 
         //    cout << all_points[i];
@@ -891,6 +877,12 @@ void trajectoryRead(void)
         stddev_y.push_back(sqrt(ysum/numTrajectories));
         stddev_z.push_back(sqrt(zsum/numTrajectories));
     }
+    // cout << ave_x[0] << endl;
+    // cout << ave_y[0] << endl;
+    // cout << ave_z[0] << endl;
+    // cout << ave_x[999] << endl;
+    // cout << ave_y[999] << endl;
+    // cout << ave_z[999] << endl;
 }
 
 void trajectoryWrite(void)
@@ -1249,41 +1241,39 @@ void updateHaptics(void)
         // desired position
         cVector3d desiredPosition;
         double kpScaler = 1;
-        // if (min < distanceTolerance || min < stdDevMag){
-        //     desiredPosition.set(position.x(),position.y(),position.z());
-        // }
-        // else {
-            
-        //     desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
-        // }
-
-        if (min > distanceTolerance ){
-            desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
+        if (min < distanceTolerance || min < (0.7 * stdDevMag)){
+            desiredPosition.set(position.x(),position.y(),position.z());
         }
         else {
-            desiredPosition.set(position.x(),position.y(),position.z());
             
+            desiredPosition.set(ave_x[minIndex], ave_y[minIndex], ave_z[minIndex]);
         }
     
         // desired orientation
         //cMatrix3d desiredRotation;
         //desiredRotation.identity();
         
-        // variables for forces
+        // variables for forces, torque, and gripper force
         cVector3d force (0,0,0);
         cVector3d torque (0,0,0);
         double gripperForce = 0;
+
         //apply force field
         if (useForceField && numTrajectories !=0)
         {
-            if (stdDevMag > (min)){
-                kpScaler = 0.75;
-            }
-            if ( stdDevMag > (2 * (min))){
-                kpScaler = 0.5;
-            }
-            if ( stdDevMag > (2.5 * (min))){
-                kpScaler = 0.25;
+            if (numTrajectories > 1){
+                if (min < 1 * stdDevMag){
+                    kpScaler = 0.5;
+                }
+                if (min < 1.5 * stdDevMag){
+                    kpScaler = 0.8;
+                }
+                if (min > 2 * stdDevMag){
+                    kpScaler = 1.5;
+                }
+                if (min > 3 * stdDevMag){
+                    kpScaler = 2;
+                }
             }
             // compute linear force
             double Kp = proportionalInput * kpScaler; // [N/m]
@@ -1327,8 +1317,7 @@ void updateHaptics(void)
         loopCount = loopCount + 1;
 
         // sleep to set update rate at approximately 1000Hz
-         usleep(325);
-         //cout << "Work";
+         usleep(100);
     }
     
     // exit haptics thread
